@@ -27,7 +27,13 @@
       "name": "Ler Emails Novos",
       "type": "n8n-nodes-base.emailReadImap",
       "typeVersion": 2,
-      "position": [260, 300]
+      "position": [260, 300],
+      "credentials": {
+        "imap": {
+          "id": "zY5lgeUsLROdzJo7",
+          "name": "IMAP - monitoramento.atividades@wowcubo.com.br"
+        }
+      }
     },
     {
       "parameters": {
@@ -58,11 +64,17 @@
       "name": "Claude API Classificar",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [520, 300]
+      "position": [520, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "GPLcpmDpmzjLfPYU",
+          "name": "Anthropic API Key"
+        }
+      }
     },
     {
       "parameters": {
-        "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  try {\n    const content = item.json.content[0].text;\n    let jsonStr = content;\n    const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) jsonStr = jsonMatch[0];\n    const classificacao = JSON.parse(jsonStr);\n    results.push({ json: { email_de: item.json.from || '', email_assunto: item.json.subject || '', email_data: item.json.date || '', ...classificacao, processado_em: new Date().toISOString() } });\n  } catch (e) {\n    results.push({ json: { erro: 'Falha ao processar resposta da IA', detalhes: e.message } });\n  }\n}\nreturn results;"
+        "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  try {\n    const content = item.json.content[0].text;\n    let jsonStr = content;\n    const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) jsonStr = jsonMatch[0];\n    const classificacao = JSON.parse(jsonStr);\n    \n    const urgencia = classificacao.urgencia || 0;\n    const anomalia = classificacao.anomalia || false;\n    let alerta = 'normal';\n    if (urgencia >= 4) alerta = 'urgente';\n    else if (anomalia === true) alerta = 'anomalia';\n    \n    results.push({ json: { email_de: item.json.from || '', email_assunto: item.json.subject || '', email_data: item.json.date || '', ...classificacao, alerta: alerta, processado_em: new Date().toISOString() } });\n  } catch (e) {\n    results.push({ json: { erro: 'Falha ao processar resposta da IA', detalhes: e.message, alerta: 'erro' } });\n  }\n}\nreturn results;"
       },
       "name": "Processar Resposta",
       "type": "n8n-nodes-base.code",
@@ -90,121 +102,8 @@
       },
       "name": "Salvar no Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
+      "typeVersion": 4,
       "position": [1040, 300]
-    },
-    {
-      "parameters": {
-        "rules": {
-          "rules": [
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": false,
-                  "leftValue": "",
-                  "typeValidation": "loose"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.urgencia }}",
-                    "rightValue": 4,
-                    "operator": {
-                      "type": "number",
-                      "operation": "gte"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Urgente"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": false,
-                  "leftValue": "",
-                  "typeValidation": "loose"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.anomalia }}",
-                    "rightValue": true,
-                    "operator": {
-                      "type": "boolean",
-                      "operation": "true"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Anomalia"
-            },
-            {
-              "conditions": {
-                "options": {
-                  "caseSensitive": false,
-                  "leftValue": "",
-                  "typeValidation": "loose"
-                },
-                "conditions": [
-                  {
-                    "leftValue": "={{ $json.urgencia }}",
-                    "rightValue": 3,
-                    "operator": {
-                      "type": "number",
-                      "operation": "lte"
-                    }
-                  }
-                ],
-                "combinator": "and"
-              },
-              "renameOutput": "Normal"
-            }
-          ]
-        },
-        "options": {
-          "allMatchingOutputs": true
-        }
-      },
-      "name": "Decisao",
-      "type": "n8n-nodes-base.switch",
-      "typeVersion": 3.2,
-      "position": [1300, 300]
-    },
-    {
-      "parameters": {
-        "fromEmail": "monitoramento.atividades@wowcubo.com.br",
-        "toEmail": "",
-        "subject": "=URGENTE: {{ $json.categoria }} - {{ $json.resumo }}",
-        "emailType": "html",
-        "html": "=<h2>Email Urgente Detectado</h2><table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td><b>De:</b></td><td>{{ $json.email_de }}</td></tr><tr><td><b>Assunto:</b></td><td>{{ $json.email_assunto }}</td></tr><tr><td><b>Categoria:</b></td><td>{{ $json.categoria }}</td></tr><tr><td><b>Urgencia:</b></td><td>{{ $json.urgencia }}/5</td></tr><tr><td><b>Resumo:</b></td><td>{{ $json.resumo }}</td></tr><tr><td><b>Acao Sugerida:</b></td><td>{{ $json.acao_sugerida }}</td></tr></table>",
-        "options": {}
-      },
-      "name": "Alerta Urgente",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [1560, 140]
-    },
-    {
-      "parameters": {
-        "fromEmail": "monitoramento.atividades@wowcubo.com.br",
-        "toEmail": "",
-        "subject": "=ANOMALIA: {{ $json.categoria }} - {{ $json.resumo }}",
-        "emailType": "html",
-        "html": "=<h2>Anomalia Detectada</h2><table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td><b>De:</b></td><td>{{ $json.email_de }}</td></tr><tr><td><b>Assunto:</b></td><td>{{ $json.email_assunto }}</td></tr><tr><td><b>Motivo:</b></td><td>{{ $json.motivo_anomalia }}</td></tr><tr><td><b>Resumo:</b></td><td>{{ $json.resumo }}</td></tr><tr><td><b>Acao Sugerida:</b></td><td>{{ $json.acao_sugerida }}</td></tr></table>",
-        "options": {}
-      },
-      "name": "Alerta Anomalia",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [1560, 300]
-    },
-    {
-      "parameters": {},
-      "name": "Apenas Registrado",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [1560, 460]
     }
   ],
   "connections": {
@@ -219,16 +118,6 @@
     },
     "Processar Resposta": {
       "main": [[{"node": "Salvar no Google Sheets", "type": "main", "index": 0}]]
-    },
-    "Salvar no Google Sheets": {
-      "main": [[{"node": "Decisao", "type": "main", "index": 0}]]
-    },
-    "Decisao": {
-      "main": [
-        [{"node": "Alerta Urgente", "type": "main", "index": 0}],
-        [{"node": "Alerta Anomalia", "type": "main", "index": 0}],
-        [{"node": "Apenas Registrado", "type": "main", "index": 0}]
-      ]
     }
   },
   "settings": {
