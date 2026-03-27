@@ -1,0 +1,357 @@
+{
+    "updatedAt": "2026-03-27T06:23:01.441Z",
+    "createdAt": "2026-03-27T05:53:26.654Z",
+    "id": "e76WAPogOMQOJjJa",
+    "name": "Monitorador de E-mail Inteligente",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+        {
+            "parameters": {
+                "pollTimes": {
+                    "item": [
+                        {
+                            "mode": "everyX",
+                            "value": 60,
+                            "unit": "minutes"
+                        }
+                    ]
+                },
+                "filters": {}
+            },
+            "name": "Gmail - Emails Novos",
+            "type": "n8n-nodes-base.gmailTrigger",
+            "typeVersion": 1,
+            "position": [
+                0,
+                304
+            ],
+            "id": "cf582e90-3b51-4577-b3a8-fac8ea291afc",
+            "credentials": {
+                "gmailOAuth2": {
+                    "id": "XirkAAAoxac8gEDo",
+                    "name": "Gmail - monitoramento.atividades@wowcubo.com.br"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "method": "POST",
+                "url": "https://api.anthropic.com/v1/messages",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "sendHeaders": true,
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "anthropic-version",
+                            "value": "2023-06-01"
+                        },
+                        {
+                            "name": "content-type",
+                            "value": "application/json"
+                        }
+                    ]
+                },
+                "sendBody": true,
+                "specifyBody": "json",
+                "jsonBody": "={{ JSON.stringify($json) }}",
+                "options": {
+                    "timeout": 30000
+                }
+            },
+            "name": "Claude API Classificar",
+            "type": "n8n-nodes-base.httpRequest",
+            "typeVersion": 4.2,
+            "position": [
+                590,
+                300
+            ],
+            "id": "98a0f9bc-78df-4c81-adfb-f60261f8b0de",
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "GPLcpmDpmzjLfPYU",
+                    "name": "Anthropic API Key - Monitorador"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  try {\n    const content = item.json.content[0].text;\n    let jsonStr = content;\n    jsonStr = jsonStr.replace(/```json\\n?/g, '').replace(/```\\n?/g, '');\n    const jsonMatch = jsonStr.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) jsonStr = jsonMatch[0];\n    const classificacao = JSON.parse(jsonStr);\n\n    const urgencia = classificacao.urgencia || 0;\n    const anomalia = classificacao.anomalia || false;\n    let alerta = 'normal';\n    if (urgencia >= 4) alerta = 'urgente';\n    else if (anomalia === true) alerta = 'anomalia';\n\n    const gmailData = $('Gmail - Emails Novos').first().json;\n\n    results.push({ json: {\n      email_de: gmailData.From || '',\n      email_assunto: gmailData.Subject || '',\n      email_data: new Date(parseInt(gmailData.internalDate || '0')).toISOString(),\n      ...classificacao,\n      alerta: alerta,\n      processado_em: new Date().toISOString()\n    }});\n  } catch (e) {\n    results.push({ json: { erro: 'Falha ao processar resposta da IA', detalhes: e.message, alerta: 'erro' } });\n  }\n}\nreturn results;"
+            },
+            "name": "Processar Resposta",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                850,
+                300
+            ],
+            "id": "cd68f7a9-0a0d-4a37-8c8b-b78790f939d0"
+        },
+        {
+            "parameters": {
+                "operation": "append",
+                "documentId": {
+                    "__rl": true,
+                    "mode": "url",
+                    "value": "https://docs.google.com/spreadsheets/d/1yMNQaeHXTZ0ct5IRSY08EJEyhRehKdmL70MvlgtQ668/edit"
+                },
+                "sheetName": {
+                    "__rl": true,
+                    "value": "Log",
+                    "mode": "name"
+                },
+                "columns": {
+                    "mappingMode": "autoMapInputData",
+                    "value": {},
+                    "matchingColumns": [],
+                    "schema": [
+                        {
+                            "id": "email_de",
+                            "displayName": "email_de",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "email_assunto",
+                            "displayName": "email_assunto",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "email_data",
+                            "displayName": "email_data",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "categoria",
+                            "displayName": "categoria",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "urgencia",
+                            "displayName": "urgencia",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "anomalia",
+                            "displayName": "anomalia",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "motivo_anomalia",
+                            "displayName": "motivo_anomalia",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "resumo",
+                            "displayName": "resumo",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "acao_sugerida",
+                            "displayName": "acao_sugerida",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "departamento_destino",
+                            "displayName": "departamento_destino",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "tags",
+                            "displayName": "tags",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "alerta",
+                            "displayName": "alerta",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        },
+                        {
+                            "id": "processado_em",
+                            "displayName": "processado_em",
+                            "required": false,
+                            "defaultMatch": false,
+                            "display": true,
+                            "type": "string",
+                            "canBeUsedToMatch": true,
+                            "removed": false
+                        }
+                    ],
+                    "attemptToConvertTypes": false,
+                    "convertFieldsToString": false
+                },
+                "options": {}
+            },
+            "name": "Salvar no Google Sheets",
+            "type": "n8n-nodes-base.googleSheets",
+            "typeVersion": 4,
+            "position": [
+                1110,
+                300
+            ],
+            "id": "b5159a09-0529-42fc-a2b3-b8ebece41e7c",
+            "credentials": {
+                "googleSheetsOAuth2Api": {
+                    "id": "7oCMUv1ewFSIrgV0",
+                    "name": "Google Sheets account 5"
+                }
+            }
+        },
+        {
+            "parameters": {
+                "jsCode": "const email = $input.first().json;\n\nconst prompt = `Voce e um assistente especializado em classificar e-mails corporativos. Analise o e-mail abaixo e retorne APENAS um JSON valido, sem markdown, sem code blocks, sem explicacao.\n\nCategorias: Financeiro, Suporte, Vendas, Administrativo, Sistema, Spam\nUrgencia: 1 (informativo) a 5 (critico)\nAnomalia: true se remetente suspeito, phishing, solicitacao financeira urgente inesperada, erro de sistema, ou padrao incomum.\n\nDe: ${email.From || 'desconhecido'}\nAssunto: ${email.Subject || 'sem assunto'}\nConteudo: ${email.snippet || 'sem conteudo'}\n\nRetorne este JSON preenchido:\n{\"categoria\": \"string\", \"urgencia\": 1, \"anomalia\": false, \"motivo_anomalia\": \"string ou null\", \"resumo\": \"resumo em 1 linha\", \"acao_sugerida\": \"o que fazer\", \"departamento_destino\": \"string ou null\", \"tags\": [\"tag1\"]}`;\n\nreturn [{\n  json: {\n    model: \"claude-haiku-4-5-20251001\",\n    max_tokens: 1024,\n    messages: [{ role: \"user\", content: prompt }]\n  }\n}];"
+            },
+            "name": "Montar Prompt",
+            "type": "n8n-nodes-base.code",
+            "typeVersion": 2,
+            "position": [
+                390,
+                300
+            ],
+            "id": "5b8a1fe0-f56d-4533-8966-56f0b5ecaf6b"
+        }
+    ],
+    "connections": {
+        "Gmail - Emails Novos": {
+            "main": [
+                [
+                    {
+                        "node": "Montar Prompt",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Montar Prompt": {
+            "main": [
+                [
+                    {
+                        "node": "Claude API Classificar",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Claude API Classificar": {
+            "main": [
+                [
+                    {
+                        "node": "Processar Resposta",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Processar Resposta": {
+            "main": [
+                [
+                    {
+                        "node": "Salvar no Google Sheets",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false,
+        "binaryMode": "separate"
+    },
+    "staticData": null,
+    "meta": {
+        "templateCredsSetupCompleted": true
+    },
+    "pinData": {},
+    "versionId": "888fbaa0-a82e-4909-a7d5-41cbbc78660c",
+    "activeVersionId": null,
+    "versionCounter": 19,
+    "triggerCount": 0,
+    "shared": [
+        {
+            "updatedAt": "2026-03-27T05:53:26.656Z",
+            "createdAt": "2026-03-27T05:53:26.656Z",
+            "role": "workflow:owner",
+            "workflowId": "e76WAPogOMQOJjJa",
+            "projectId": "5A9IPG2mRNRa2Z6l",
+            "project": {
+                "updatedAt": "2025-08-26T20:48:14.448Z",
+                "createdAt": "2025-08-26T20:48:11.587Z",
+                "id": "5A9IPG2mRNRa2Z6l",
+                "name": "Wowcubo Comunicacao <wowcubo@wowcubo.com.br>",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "60f73ae9-e12c-4e9d-871e-5337a456b26d"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": null
+}
