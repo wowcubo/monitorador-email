@@ -1,0 +1,18 @@
+# Credenciais e segredos
+.env
+*.key
+*.pem
+credentials.json
+secrets/
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node
+node_modules/
+
+# IDE
+.vscode/
+.idea/
