@@ -1,0 +1,237 @@
+{
+  "name": "Monitorador de E-mail Inteligente",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "name": "A cada 1 hora",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "nothing",
+        "options": {},
+        "format": "simple"
+      },
+      "name": "Ler Emails Novos",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2,
+      "position": [260, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Voce e um assistente especializado em classificar e-mails corporativos. Analise o e-mail abaixo e retorne APENAS um JSON valido, sem markdown, sem explicacao.\\n\\nCategorias: Financeiro, Suporte, Vendas, Administrativo, Sistema, Spam\\nUrgencia: 1 (informativo) a 5 (critico)\\nAnomalia: true se remetente suspeito, phishing, solicitacao financeira urgente inesperada, erro de sistema, ou padrao incomum.\\n\\nDe: {{ $json.from }}\\nAssunto: {{ $json.subject }}\\nData: {{ $json.date }}\\nCorpo: {{ $json.textPlain }}\\n\\nRetorne JSON:\\n{\\n  \\\"categoria\\\": \\\"string\\\",\\n  \\\"urgencia\\\": 1-5,\\n  \\\"anomalia\\\": true/false,\\n  \\\"motivo_anomalia\\\": \\\"string ou null\\\",\\n  \\\"resumo\\\": \\\"resumo em 1 linha\\\",\\n  \\\"acao_sugerida\\\": \\\"o que fazer\\\",\\n  \\\"departamento_destino\\\": \\\"string ou null\\\",\\n  \\\"tags\\\": [\\\"tag1\\\"]\\n}\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "name": "Claude API Classificar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [520, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = [];\nfor (const item of items) {\n  try {\n    const content = item.json.content[0].text;\n    let jsonStr = content;\n    const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) jsonStr = jsonMatch[0];\n    const classificacao = JSON.parse(jsonStr);\n    results.push({ json: { email_de: item.json.from || '', email_assunto: item.json.subject || '', email_data: item.json.date || '', ...classificacao, processado_em: new Date().toISOString() } });\n  } catch (e) {\n    results.push({ json: { erro: 'Falha ao processar resposta da IA', detalhes: e.message } });\n  }\n}\nreturn results;"
+      },
+      "name": "Processar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [780, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "url",
+          "value": ""
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "list",
+          "value": "Log"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "name": "Salvar no Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1040, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.urgencia }}",
+                    "rightValue": 4,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "Urgente"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.anomalia }}",
+                    "rightValue": true,
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "Anomalia"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false,
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.urgencia }}",
+                    "rightValue": 3,
+                    "operator": {
+                      "type": "number",
+                      "operation": "lte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": "Normal"
+            }
+          ]
+        },
+        "options": {
+          "allMatchingOutputs": true
+        }
+      },
+      "name": "Decisao",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1300, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "monitoramento.atividades@wowcubo.com.br",
+        "toEmail": "",
+        "subject": "=URGENTE: {{ $json.categoria }} - {{ $json.resumo }}",
+        "emailType": "html",
+        "html": "=<h2>Email Urgente Detectado</h2><table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td><b>De:</b></td><td>{{ $json.email_de }}</td></tr><tr><td><b>Assunto:</b></td><td>{{ $json.email_assunto }}</td></tr><tr><td><b>Categoria:</b></td><td>{{ $json.categoria }}</td></tr><tr><td><b>Urgencia:</b></td><td>{{ $json.urgencia }}/5</td></tr><tr><td><b>Resumo:</b></td><td>{{ $json.resumo }}</td></tr><tr><td><b>Acao Sugerida:</b></td><td>{{ $json.acao_sugerida }}</td></tr></table>",
+        "options": {}
+      },
+      "name": "Alerta Urgente",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1560, 140]
+    },
+    {
+      "parameters": {
+        "fromEmail": "monitoramento.atividades@wowcubo.com.br",
+        "toEmail": "",
+        "subject": "=ANOMALIA: {{ $json.categoria }} - {{ $json.resumo }}",
+        "emailType": "html",
+        "html": "=<h2>Anomalia Detectada</h2><table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;\"><tr><td><b>De:</b></td><td>{{ $json.email_de }}</td></tr><tr><td><b>Assunto:</b></td><td>{{ $json.email_assunto }}</td></tr><tr><td><b>Motivo:</b></td><td>{{ $json.motivo_anomalia }}</td></tr><tr><td><b>Resumo:</b></td><td>{{ $json.resumo }}</td></tr><tr><td><b>Acao Sugerida:</b></td><td>{{ $json.acao_sugerida }}</td></tr></table>",
+        "options": {}
+      },
+      "name": "Alerta Anomalia",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {},
+      "name": "Apenas Registrado",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1560, 460]
+    }
+  ],
+  "connections": {
+    "A cada 1 hora": {
+      "main": [[{"node": "Ler Emails Novos", "type": "main", "index": 0}]]
+    },
+    "Ler Emails Novos": {
+      "main": [[{"node": "Claude API Classificar", "type": "main", "index": 0}]]
+    },
+    "Claude API Classificar": {
+      "main": [[{"node": "Processar Resposta", "type": "main", "index": 0}]]
+    },
+    "Processar Resposta": {
+      "main": [[{"node": "Salvar no Google Sheets", "type": "main", "index": 0}]]
+    },
+    "Salvar no Google Sheets": {
+      "main": [[{"node": "Decisao", "type": "main", "index": 0}]]
+    },
+    "Decisao": {
+      "main": [
+        [{"node": "Alerta Urgente", "type": "main", "index": 0}],
+        [{"node": "Alerta Anomalia", "type": "main", "index": 0}],
+        [{"node": "Apenas Registrado", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
