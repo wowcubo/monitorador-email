@@ -12,32 +12,24 @@
           ]
         }
       },
-      "id": "trigger-interval",
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
       "name": "A cada 1 hora",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [0, 300]
     },
     {
       "parameters": {
         "mailbox": "INBOX",
         "postProcessAction": "nothing",
-        "options": {
-          "customEmailConfig": "[]"
-        },
+        "options": {},
         "format": "simple"
       },
-      "id": "imap-read",
+      "id": "a1b2c3d4-0001-4000-8000-000000000002",
       "name": "Ler E-mails Novos",
       "type": "n8n-nodes-base.emailReadImap",
       "typeVersion": 2,
-      "position": [250, 0],
-      "credentials": {
-        "imap": {
-          "id": "CONFIGURAR_CREDENCIAL_IMAP",
-          "name": "IMAP - monitoramento.atividades@wowcubo.com.br"
-        }
-      }
+      "position": [250, 300]
     },
     {
       "parameters": {
@@ -60,32 +52,26 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Você é um assistente especializado em classificar e-mails corporativos. Analise o e-mail abaixo e retorne APENAS um JSON válido, sem markdown, sem explicação.\\n\\nCategorias: Financeiro, Suporte, Vendas, Administrativo, Sistema, Spam\\nUrgência: 1 (informativo) a 5 (crítico)\\nAnomalia: true se remetente suspeito, phishing, solicitação financeira urgente inesperada, erro de sistema, ou padrão incomum.\\n\\n**De:** {{ $json.from }}\\n**Assunto:** {{ $json.subject }}\\n**Data:** {{ $json.date }}\\n**Corpo:**\\n{{ $json.textPlain }}\\n\\nRetorne JSON:\\n{\\n  \\\"categoria\\\": \\\"string\\\",\\n  \\\"urgencia\\\": 1-5,\\n  \\\"anomalia\\\": true/false,\\n  \\\"motivo_anomalia\\\": \\\"string ou null\\\",\\n  \\\"resumo\\\": \\\"resumo em 1 linha\\\",\\n  \\\"acao_sugerida\\\": \\\"o que fazer\\\",\\n  \\\"departamento_destino\\\": \\\"string ou null\\\",\\n  \\\"tags\\\": [\\\"tag1\\\"]\\n}\"\n    }\n  ]\n}",
+        "jsonBody": "={\n  \"model\": \"claude-haiku-4-5-20251001\",\n  \"max_tokens\": 1024,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Voce e um assistente especializado em classificar e-mails corporativos. Analise o e-mail abaixo e retorne APENAS um JSON valido, sem markdown, sem explicacao.\\n\\nCategorias: Financeiro, Suporte, Vendas, Administrativo, Sistema, Spam\\nUrgencia: 1 (informativo) a 5 (critico)\\nAnomalia: true se remetente suspeito, phishing, solicitacao financeira urgente inesperada, erro de sistema, ou padrao incomum.\\n\\nDe: {{ $json.from }}\\nAssunto: {{ $json.subject }}\\nData: {{ $json.date }}\\nCorpo: {{ $json.textPlain }}\\n\\nRetorne JSON:\\n{\\n  \\\"categoria\\\": \\\"string\\\",\\n  \\\"urgencia\\\": 1-5,\\n  \\\"anomalia\\\": true/false,\\n  \\\"motivo_anomalia\\\": \\\"string ou null\\\",\\n  \\\"resumo\\\": \\\"resumo em 1 linha\\\",\\n  \\\"acao_sugerida\\\": \\\"o que fazer\\\",\\n  \\\"departamento_destino\\\": \\\"string ou null\\\",\\n  \\\"tags\\\": [\\\"tag1\\\"]\\n}\"\n    }\n  ]\n}",
         "options": {
           "timeout": 30000
         }
       },
-      "id": "claude-api",
+      "id": "a1b2c3d4-0001-4000-8000-000000000003",
       "name": "Claude API - Classificar",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [500, 0],
-      "credentials": {
-        "httpHeaderAuth": {
-          "id": "CONFIGURAR_CREDENCIAL_ANTHROPIC",
-          "name": "Anthropic API Key"
-        }
-      }
+      "position": [500, 300]
     },
     {
       "parameters": {
-        "jsCode": "// Extrai o JSON da resposta do Claude\nconst items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  try {\n    const content = item.json.content[0].text;\n    \n    // Tenta extrair JSON mesmo se vier com markdown\n    let jsonStr = content;\n    const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      jsonStr = jsonMatch[0];\n    }\n    \n    const classificacao = JSON.parse(jsonStr);\n    \n    results.push({\n      json: {\n        // Dados originais do e-mail\n        email_de: item.json.from || items[0]?.json?.from || '',\n        email_assunto: item.json.subject || items[0]?.json?.subject || '',\n        email_data: item.json.date || items[0]?.json?.date || '',\n        // Classificação da IA\n        ...classificacao,\n        // Metadata\n        processado_em: new Date().toISOString()\n      }\n    });\n  } catch (e) {\n    results.push({\n      json: {\n        erro: 'Falha ao processar resposta da IA',\n        detalhes: e.message,\n        resposta_raw: item.json.content?.[0]?.text || 'sem resposta'\n      }\n    });\n  }\n}\n\nreturn results;"
+        "jsCode": "const items = $input.all();\nconst results = [];\n\nfor (const item of items) {\n  try {\n    const content = item.json.content[0].text;\n    let jsonStr = content;\n    const jsonMatch = content.match(/\\{[\\s\\S]*\\}/);\n    if (jsonMatch) {\n      jsonStr = jsonMatch[0];\n    }\n    const classificacao = JSON.parse(jsonStr);\n    results.push({\n      json: {\n        email_de: item.json.from || '',\n        email_assunto: item.json.subject || '',\n        email_data: item.json.date || '',\n        ...classificacao,\n        processado_em: new Date().toISOString()\n      }\n    });\n  } catch (e) {\n    results.push({\n      json: {\n        erro: 'Falha ao processar resposta da IA',\n        detalhes: e.message,\n        resposta_raw: item.json.content?.[0]?.text || 'sem resposta'\n      }\n    });\n  }\n}\n\nreturn results;"
       },
-      "id": "parse-response",
+      "id": "a1b2c3d4-0001-4000-8000-000000000004",
       "name": "Processar Resposta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [750, 0]
+      "position": [750, 300]
     },
     {
       "parameters": {
@@ -93,7 +79,7 @@
         "documentId": {
           "__rl": true,
           "mode": "url",
-          "value": "CONFIGURAR_URL_DA_PLANILHA"
+          "value": ""
         },
         "sheetName": {
           "__rl": true,
@@ -106,17 +92,11 @@
         },
         "options": {}
       },
-      "id": "google-sheets",
+      "id": "a1b2c3d4-0001-4000-8000-000000000005",
       "name": "Salvar no Google Sheets",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
-      "position": [1000, 0],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "CONFIGURAR_CREDENCIAL_GOOGLE",
-          "name": "Google Sheets"
-        }
-      }
+      "position": [1000, 300]
     },
     {
       "parameters": {
@@ -191,61 +171,49 @@
           "allMatchingOutputs": true
         }
       },
-      "id": "switch-decisao",
-      "name": "Decisão",
+      "id": "a1b2c3d4-0001-4000-8000-000000000006",
+      "name": "Decisao",
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3.2,
-      "position": [1250, 0]
+      "position": [1250, 300]
     },
     {
       "parameters": {
         "fromEmail": "monitoramento.atividades@wowcubo.com.br",
-        "toEmail": "CONFIGURAR_SEU_EMAIL_PESSOAL",
-        "subject": "=🚨 URGENTE: {{ $json.categoria }} - {{ $json.resumo }}",
+        "toEmail": "",
+        "subject": "=URGENTE: {{ $json.categoria }} - {{ $json.resumo }}",
         "emailType": "html",
-        "html": "=<h2>⚠️ E-mail Urgente Detectado</h2>\n<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;\">\n  <tr><td><b>De:</b></td><td>{{ $json.email_de }}</td></tr>\n  <tr><td><b>Assunto:</b></td><td>{{ $json.email_assunto }}</td></tr>\n  <tr><td><b>Categoria:</b></td><td>{{ $json.categoria }}</td></tr>\n  <tr><td><b>Urgência:</b></td><td>{{ $json.urgencia }}/5</td></tr>\n  <tr><td><b>Resumo:</b></td><td>{{ $json.resumo }}</td></tr>\n  <tr><td><b>Ação Sugerida:</b></td><td>{{ $json.acao_sugerida }}</td></tr>\n  <tr><td><b>Departamento:</b></td><td>{{ $json.departamento_destino }}</td></tr>\n</table>\n<p><small>Processado em: {{ $json.processado_em }}</small></p>",
+        "html": "=<h2>E-mail Urgente Detectado</h2><table border='1' cellpadding='8' cellspacing='0' style='border-collapse:collapse;'><tr><td><b>De:</b></td><td>{{ $json.email_de }}</td></tr><tr><td><b>Assunto:</b></td><td>{{ $json.email_assunto }}</td></tr><tr><td><b>Categoria:</b></td><td>{{ $json.categoria }}</td></tr><tr><td><b>Urgencia:</b></td><td>{{ $json.urgencia }}/5</td></tr><tr><td><b>Resumo:</b></td><td>{{ $json.resumo }}</td></tr><tr><td><b>Acao Sugerida:</b></td><td>{{ $json.acao_sugerida }}</td></tr><tr><td><b>Departamento:</b></td><td>{{ $json.departamento_destino }}</td></tr></table><p><small>Processado em: {{ $json.processado_em }}</small></p>",
         "options": {}
       },
-      "id": "alerta-urgente",
+      "id": "a1b2c3d4-0001-4000-8000-000000000007",
       "name": "Alerta Urgente",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1500, -150],
-      "credentials": {
-        "smtp": {
-          "id": "CONFIGURAR_CREDENCIAL_SMTP",
-          "name": "SMTP - wowcubo"
-        }
-      }
+      "position": [1500, 150]
     },
     {
       "parameters": {
         "fromEmail": "monitoramento.atividades@wowcubo.com.br",
-        "toEmail": "CONFIGURAR_SEU_EMAIL_PESSOAL",
-        "subject": "=🔍 ANOMALIA: {{ $json.categoria }} - {{ $json.resumo }}",
+        "toEmail": "",
+        "subject": "=ANOMALIA: {{ $json.categoria }} - {{ $json.resumo }}",
         "emailType": "html",
-        "html": "=<h2>🔍 Anomalia Detectada</h2>\n<table border=\"1\" cellpadding=\"8\" cellspacing=\"0\" style=\"border-collapse:collapse;\">\n  <tr><td><b>De:</b></td><td>{{ $json.email_de }}</td></tr>\n  <tr><td><b>Assunto:</b></td><td>{{ $json.email_assunto }}</td></tr>\n  <tr><td><b>Categoria:</b></td><td>{{ $json.categoria }}</td></tr>\n  <tr><td><b>Motivo da Anomalia:</b></td><td>{{ $json.motivo_anomalia }}</td></tr>\n  <tr><td><b>Resumo:</b></td><td>{{ $json.resumo }}</td></tr>\n  <tr><td><b>Ação Sugerida:</b></td><td>{{ $json.acao_sugerida }}</td></tr>\n  <tr><td><b>Tags:</b></td><td>{{ $json.tags }}</td></tr>\n</table>\n<p><small>Processado em: {{ $json.processado_em }}</small></p>",
+        "html": "=<h2>Anomalia Detectada</h2><table border='1' cellpadding='8' cellspacing='0' style='border-collapse:collapse;'><tr><td><b>De:</b></td><td>{{ $json.email_de }}</td></tr><tr><td><b>Assunto:</b></td><td>{{ $json.email_assunto }}</td></tr><tr><td><b>Categoria:</b></td><td>{{ $json.categoria }}</td></tr><tr><td><b>Motivo:</b></td><td>{{ $json.motivo_anomalia }}</td></tr><tr><td><b>Resumo:</b></td><td>{{ $json.resumo }}</td></tr><tr><td><b>Acao Sugerida:</b></td><td>{{ $json.acao_sugerida }}</td></tr><tr><td><b>Tags:</b></td><td>{{ $json.tags }}</td></tr></table><p><small>Processado em: {{ $json.processado_em }}</small></p>",
         "options": {}
       },
-      "id": "alerta-anomalia",
+      "id": "a1b2c3d4-0001-4000-8000-000000000008",
       "name": "Alerta Anomalia",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [1500, 0],
-      "credentials": {
-        "smtp": {
-          "id": "CONFIGURAR_CREDENCIAL_SMTP",
-          "name": "SMTP - wowcubo"
-        }
-      }
+      "position": [1500, 300]
     },
     {
       "parameters": {},
-      "id": "noop-normal",
+      "id": "a1b2c3d4-0001-4000-8000-000000000009",
       "name": "Apenas Registrado",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
-      "position": [1500, 150]
+      "position": [1500, 450]
     }
   ],
   "connections": {
@@ -297,14 +265,14 @@
       "main": [
         [
           {
-            "node": "Decisão",
+            "node": "Decisao",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Decisão": {
+    "Decisao": {
       "main": [
         [
           {
@@ -334,15 +302,5 @@
     "executionOrder": "v1",
     "saveManualExecutions": true,
     "callerPolicy": "workflowsFromSameOwner"
-  },
-  "tags": [
-    {
-      "name": "monitoramento",
-      "id": "1"
-    },
-    {
-      "name": "email",
-      "id": "2"
-    }
-  ]
+  }
 }
